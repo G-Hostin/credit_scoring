@@ -17,3 +17,7 @@ data/processed/
 
 # OS
 .DS_Store
+
+# MLflow
+mlruns/
+mlflow.db
