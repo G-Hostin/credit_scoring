@@ -11,10 +11,12 @@ dependencies = [
     "matplotlib>=3.10.9",
     "missingno>=0.5.2",
     "mlflow>=3.0",
+    "numba>=0.59",
     "numpy>=2.4.4",
     "pandas>=2.0,<3.0",
     "pyarrow<24",
     "scikit-learn>=1.8.0",
     "seaborn>=0.13.2",
+    "shap>=0.46",
     "xgboost>=3.2.0",
 ]
