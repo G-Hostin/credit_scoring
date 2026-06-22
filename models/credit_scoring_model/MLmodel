@@ -1,0 +1,23 @@
+artifact_path: file:C:/Users/gregh/Desktop/OpenClassrooms/AI Engineer/P6/P6_credit_scoring/notebooks/../mlruns/794421436524967845/models/m-ca2912e833f940ffa22f166375689cfd/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.13.11
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.8.0
+    skops_trusted_types: null
+mlflow_version: 3.12.0
+model_id: m-ca2912e833f940ffa22f166375689cfd
+model_size_bytes: 774454
+model_uuid: m-ca2912e833f940ffa22f166375689cfd
+prompts: null
+run_id: bc3b8be730584e7a996bbff2f1f229b9
+utc_time_created: '2026-05-16 16:46:40.701333'

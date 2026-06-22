@@ -1,0 +1,6 @@
+{
+  "threshold": 0.53,
+  "description": "Seuil de decision optimal minimisant le cout metier (FN x10, FP x1), determine au notebook 04. Au-dessus de ce seuil, la demande de credit est refusee (probabilite de defaut trop elevee).",
+  "model": "P6_credit_scoring_model",
+  "source_notebook": "notebooks/04_optimization.ipynb"
+}
