@@ -4,26 +4,32 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
+# Dépendances "cœur" : strictement ce dont l'API a besoin en production
+# (c'est cet ensemble qui sera installé dans l'image Docker).
 dependencies = [
     "fastapi>=0.115",
-    "ipykernel>=7.2.0",
-    "jupyterlab>=4.5.7",
-    "lightgbm>=4.6.0",
-    "matplotlib>=3.10.9",
-    "missingno>=0.5.2",
-    "mlflow>=3.0",
-    "numba>=0.59",
-    "numpy>=2.4.4",
-    "pandas>=2.0,<3.0",
-    "pyarrow<24",
-    "scikit-learn>=1.8.0",
-    "seaborn>=0.13.2",
-    "shap>=0.46",
     "uvicorn>=0.34",
-    "xgboost>=3.2.0",
+    "mlflow>=3.0",
+    "lightgbm>=4.6.0",
+    "scikit-learn>=1.8.0",
+    "pandas>=2.0,<3.0",
+    "numpy>=2.4.4",
+    "pyarrow<24",
 ]
 
 [dependency-groups]
+# Stack d'analyse du projet 6 (notebooks) — PAS embarquée dans l'API.
+notebooks = [
+    "ipykernel>=7.2.0",
+    "jupyterlab>=4.5.7",
+    "matplotlib>=3.10.9",
+    "missingno>=0.5.2",
+    "seaborn>=0.13.2",
+    "shap>=0.46",
+    "numba>=0.59",
+    "xgboost>=3.2.0",
+]
+# Outils de test.
 dev = [
     "pytest>=8.0",
     "httpx>=0.28",

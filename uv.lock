@@ -1611,22 +1611,13 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
-    { name = "ipykernel" },
-    { name = "jupyterlab" },
     { name = "lightgbm" },
-    { name = "matplotlib" },
-    { name = "missingno" },
     { name = "mlflow" },
-    { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "scikit-learn" },
-    { name = "seaborn" },
-    { name = "shap", version = "0.50.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
-    { name = "shap", version = "0.52.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
     { name = "uvicorn" },
-    { name = "xgboost" },
 ]
 
 [package.dev-dependencies]
@@ -1634,31 +1625,44 @@ dev = [
     { name = "httpx" },
     { name = "pytest" },
 ]
+notebooks = [
+    { name = "ipykernel" },
+    { name = "jupyterlab" },
+    { name = "matplotlib" },
+    { name = "missingno" },
+    { name = "numba" },
+    { name = "seaborn" },
+    { name = "shap", version = "0.50.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
+    { name = "shap", version = "0.52.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
+    { name = "xgboost" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "ipykernel", specifier = ">=7.2.0" },
-    { name = "jupyterlab", specifier = ">=4.5.7" },
     { name = "lightgbm", specifier = ">=4.6.0" },
-    { name = "matplotlib", specifier = ">=3.10.9" },
-    { name = "missingno", specifier = ">=0.5.2" },
     { name = "mlflow", specifier = ">=3.0" },
-    { name = "numba", specifier = ">=0.59" },
     { name = "numpy", specifier = ">=2.4.4" },
     { name = "pandas", specifier = ">=2.0,<3.0" },
     { name = "pyarrow", specifier = "<24" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
-    { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "shap", specifier = ">=0.46" },
     { name = "uvicorn", specifier = ">=0.34" },
-    { name = "xgboost", specifier = ">=3.2.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.28" },
     { name = "pytest", specifier = ">=8.0" },
+]
+notebooks = [
+    { name = "ipykernel", specifier = ">=7.2.0" },
+    { name = "jupyterlab", specifier = ">=4.5.7" },
+    { name = "matplotlib", specifier = ">=3.10.9" },
+    { name = "missingno", specifier = ">=0.5.2" },
+    { name = "numba", specifier = ">=0.59" },
+    { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "shap", specifier = ">=0.46" },
+    { name = "xgboost", specifier = ">=3.2.0" },
 ]
 
 [[package]]
