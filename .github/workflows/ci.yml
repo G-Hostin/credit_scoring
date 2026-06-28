@@ -20,8 +20,8 @@ jobs:
         run: uv python install 3.13
       - name: Installer les dépendances (cœur + dev)
         run: uv sync
-      - name: Lancer les tests
-        run: uv run pytest -q
+      - name: Lancer les tests (avec couverture)
+        run: uv run pytest --cov=api --cov-report=term -q
 
   build:
     name: Build Docker
