@@ -15,7 +15,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv python install 3.13
       - run: uv sync
-      - run: uv run pytest -q
+      - run: uv run pytest --cov=api --cov-report=term -q
 
   build:
     name: Build Docker
