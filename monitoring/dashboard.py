@@ -111,6 +111,14 @@ with tab_ops:
         use_container_width=True,
     )
 
+    with st.expander("🗄️ Données stockées (extrait des dernières prédictions)"):
+        recent = (
+            prod[["created_at", "probability_default", "decision", "latency_ms", "status"]]
+            .sort_values("created_at", ascending=False)
+            .head(20)
+        )
+        st.dataframe(recent, use_container_width=True, hide_index=True)
+
 with tab_drift:
     drift, report_html = compute_drift(reference, production)
     n_drift = int(drift["dérive"].sum())
