@@ -48,7 +48,7 @@ def load_data():
     reference = pd.read_parquet(REFERENCE_PATH)
     engine = create_engine(DB_URL)
     prod = pd.read_sql(
-        "SELECT created_at, features, probability_default, latency_ms, status FROM predictions",
+        "SELECT created_at, features, probability_default, decision, latency_ms, status FROM predictions",
         engine,
     )
     return reference, prod
