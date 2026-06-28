@@ -1,0 +1,27 @@
+# Image du dashboard de monitoring (Streamlit).
+FROM python:3.13-slim
+
+# Certaines dépendances d'analyse (scipy / lightgbm) utilisent OpenMP.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+WORKDIR /app
+
+# Dépendances : cœur + groupe "monitoring" uniquement (evidently, streamlit, plotly).
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-default-groups --group monitoring
+
+# Code du dashboard + référence + thème.
+COPY monitoring ./monitoring
+COPY .streamlit ./.streamlit
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/app
+
+EXPOSE 8501
+
+# Le port est fourni par l'hébergeur (Render via $PORT) ; sinon 8501 en local.
+CMD ["sh", "-c", "exec streamlit run monitoring/dashboard.py --server.port ${PORT:-8501} --server.address 0.0.0.0"]
