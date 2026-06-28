@@ -50,7 +50,9 @@ ils sont déployés sur **Render** (API + base + dashboard).
 - **Métrique métier** : coût asymétrique `FN x 10 + FP x 1` (un faux négatif, défaut non
   détecté, coûte 10x plus cher qu'un faux positif).
 - **Seuil de décision optimal** : **0.53** (voir `models/threshold.json`).
-- Le modèle est packagé au format MLflow dans `models/credit_scoring_model/`.
+- Le modèle est entraîné et versionné avec MLflow (`models/credit_scoring_model/`). Pour la
+  production, il est converti au format **ONNX** (`models/credit_scoring_model.onnx`) pour une
+  inférence rapide (voir la section Optimisation).
 
 ## API
 
@@ -103,6 +105,19 @@ Le dashboard (et le notebook `notebooks/05_monitoring.ipynb`) comparent les donn
 Une dérive confirmée est un signal d'alerte : en situation réelle, elle déclencherait
 une investigation et, si elle persiste, un **réentraînement** du modèle.
 
+## Optimisation des performances
+
+Le notebook `notebooks/06_optimization.ipynb` documente l'analyse de performance et les
+optimisations (profiling avec `cProfile`, puis mesures avant / après) :
+
+- **Inférence ONNX** : le modèle est converti en ONNX (`scripts/convert_to_onnx.py`) et servi
+  via ONNX Runtime. Inférence environ 130x plus rapide, et image Docker allégée (plus de
+  mlflow / lightgbm / scikit-learn / pandas au runtime : ~1,1 GB vers ~480 MB).
+- **Écriture non-bloquante** : l'enregistrement en base se fait en tâche de fond
+  (`BackgroundTasks`), ce qui retire ~47 ms du temps de réponse.
+- **Sans régression** : les prédictions ONNX sont identiques à celles du modèle d'origine
+  (écart de l'ordre de 1e-7).
+
 ## Déploiement et CI/CD
 
 - **Déploiement** : décrit en infrastructure-as-code dans `render.yaml` (blueprint Render)
@@ -119,10 +134,10 @@ une investigation et, si elle persiste, un **réentraînement** du modèle.
 ```
 .
 ├── api/                 # API d'inférence FastAPI + accès base de données
-├── models/              # Modèle entraîné (MLflow) + seuil de décision
+├── models/              # Modèle MLflow + modèle ONNX + médianes + seuil de décision
 ├── monitoring/          # Dashboard Streamlit, référence de drift, notebook d'analyse
-├── notebooks/           # Analyse P6 (01-04) + monitoring (05)
-├── scripts/             # Simulation de trafic de production
+├── notebooks/           # Analyse P6 (01-04) + monitoring (05) + optimisation (06)
+├── scripts/             # Simulation de trafic + conversion ONNX
 ├── tests/               # Tests unitaires de l'API
 ├── data/                # Données (non versionnées, voir .gitignore)
 ├── .github/workflows/   # Pipelines CI et CD
@@ -136,12 +151,15 @@ une investigation et, si elle persiste, un **réentraînement** du modèle.
 
 ## Installation
 
-Le projet utilise [uv](https://docs.astral.sh/uv/). Les dépendances sont organisées en
-groupes : cœur (API), `notebooks` (analyse P6), `monitoring` (dashboard) et `dev` (tests).
+Le projet utilise [uv](https://docs.astral.sh/uv/). Le **cœur** (runtime de l'API) est
+volontairement léger (FastAPI, ONNX Runtime, accès base). Le reste est rangé en groupes :
+`modeling` (modèle d'origine + conversion ONNX), `monitoring` (dashboard), `notebooks`
+(analyse P6) et `dev` (tests).
 
 ```bash
-uv sync                                   # cœur + dev
-uv sync --group notebooks --group monitoring   # tout
+uv sync                                                        # cœur + dev (lancer / tester l'API)
+uv sync --group notebooks --group modeling --group monitoring  # tout (notebooks, analyses)
+uv run jupyter lab                                             # ouvrir les notebooks
 ```
 
 ## Données
