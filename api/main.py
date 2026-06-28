@@ -6,10 +6,11 @@ probabilité de défaut ainsi que la décision (accordé / refusé) selon le seu
 optimal (0.53).
 
 Le modèle est chargé UNE seule fois au démarrage (voir `lifespan`), puis réutilisé
-pour toutes les requêtes.
+pour toutes les requêtes. Chaque prédiction est enregistrée en base (si configurée).
 """
 
 import json
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -17,6 +18,8 @@ import mlflow.sklearn
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+
+from api.database import init_db, save_prediction
 
 # --- Chemins (relatifs à ce fichier, pour fonctionner aussi dans Docker) ---
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -34,6 +37,7 @@ async def lifespan(app: FastAPI):
     # Source de vérité : les noms et l'ordre des features vus à l'entraînement.
     state["features"] = list(state["model"].feature_names_in_)
     state["threshold"] = json.loads(THRESHOLD_PATH.read_text(encoding="utf-8"))["threshold"]
+    init_db()  # crée la table 'predictions' si une base est configurée
     yield
     state.clear()
 
@@ -109,39 +113,70 @@ def health():
 
 @app.post("/predict", response_model=PredictionResponse, tags=["scoring"])
 def predict(request: PredictionRequest):
-    """Calcule la probabilité de défaut et la décision pour un client."""
+    """Calcule la probabilité de défaut et la décision pour un client.
+
+    Chaque appel (succès comme erreur) est enregistré en base avec sa latence,
+    pour permettre le suivi de production (drift, taux d'erreur, temps d'inférence).
+    """
+    start = time.perf_counter()
     expected = state["features"]
     provided = request.features
 
-    # 1) Toutes les features attendues sont-elles présentes ?
-    missing = [f for f in expected if f not in provided]
-    if missing:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message": f"{len(missing)} feature(s) manquante(s).",
-                "missing_features": missing[:20],  # on n'en montre qu'un échantillon
-            },
-        )
-
-    # 2) Règles métier (valeurs hors plage)
-    business_errors = validate_business_rules(provided)
-    if business_errors:
-        raise HTTPException(
-            status_code=422,
-            detail={"message": "Validation metier echouee.", "errors": business_errors},
-        )
-
-    # 3) Construction de la ligne dans le bon ordre, puis prédiction
     try:
-        row = {feature: provided[feature] for feature in expected}
-        X = pd.DataFrame([row], columns=expected).astype(float)
-        probability_default = float(state["model"].predict_proba(X)[0, 1])
-    except Exception as exc:  # garde-fou : toute erreur inattendue -> 500 explicite
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la prediction : {exc}")
+        # 1) Toutes les features attendues sont-elles présentes ?
+        missing = [f for f in expected if f not in provided]
+        if missing:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": f"{len(missing)} feature(s) manquante(s).",
+                    "missing_features": missing[:20],  # on n'en montre qu'un échantillon
+                },
+            )
+
+        # 2) Règles métier (valeurs hors plage)
+        business_errors = validate_business_rules(provided)
+        if business_errors:
+            raise HTTPException(
+                status_code=422,
+                detail={"message": "Validation metier echouee.", "errors": business_errors},
+            )
+
+        # 3) Construction de la ligne dans le bon ordre, puis prédiction
+        try:
+            row = {feature: provided[feature] for feature in expected}
+            X = pd.DataFrame([row], columns=expected).astype(float)
+            probability_default = float(state["model"].predict_proba(X)[0, 1])
+        except Exception as exc:  # garde-fou : toute erreur inattendue -> 500 explicite
+            raise HTTPException(status_code=500, detail=f"Erreur lors de la prediction : {exc}")
+
+    except HTTPException as exc:
+        # On enregistre l'échec (pour le taux d'erreur) puis on relaie l'erreur.
+        save_prediction(
+            features=provided,
+            probability_default=None,
+            decision=None,
+            threshold=state["threshold"],
+            latency_ms=(time.perf_counter() - start) * 1000,
+            status="error",
+            error_message=str(exc.detail),
+        )
+        raise
 
     threshold = state["threshold"]
     decision = "refusé" if probability_default >= threshold else "accordé"
+    latency_ms = (time.perf_counter() - start) * 1000
+
+    # On enregistre la prédiction réussie.
+    save_prediction(
+        features=provided,
+        probability_default=probability_default,
+        decision=decision,
+        threshold=threshold,
+        latency_ms=latency_ms,
+        status="success",
+        error_message=None,
+    )
 
     return PredictionResponse(
         probability_default=probability_default,
