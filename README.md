@@ -20,7 +20,28 @@ Ce dépôt couvre deux projets de la formation OpenClassrooms *AI Engineer* :
   engineering, modélisation et suivi des expérimentations avec MLflow.
 - **Projet 8 - Déployez et monitorez votre modèle (partie 2/2)** : mise en production du
   modèle via une API, conteneurisation Docker, CI/CD, stockage des données de production
-  et monitoring (data drift). *(en cours)*
+  et monitoring (data drift).
+
+## Démo en ligne
+
+- **API** : https://credit-scoring-api-mn5w.onrender.com (documentation interactive sur `/docs`)
+- **Dashboard de monitoring** : https://credit-scoring-dashboard-fndm.onrender.com
+
+*(Services gratuits Render : le premier accès peut prendre ~1 min, le temps que le service se réveille.)*
+
+## Architecture
+
+```
+                 POST /predict
+   client  ───────────────────▶  API (FastAPI)  ──enregistre──▶  PostgreSQL
+                                                                      │
+                          Dashboard (Streamlit)  ◀──────lit──────────┘
+```
+
+L'API sert le modèle et **enregistre chaque prédiction** (entrées, sortie, latence) en
+base. Le dashboard lit cette base pour suivre la **dérive des données** et la **santé
+opérationnelle**. En local, les services tournent via `docker compose` ; en production,
+ils sont déployés sur **Render** (API + base + dashboard).
 
 ## Modèle
 
@@ -38,43 +59,89 @@ défaut et la décision.
 
 - `GET /health` : état de l'API et chargement du modèle.
 - `POST /predict` : prédiction. Corps attendu : `{ "features": { "<nom_feature>": valeur, ... } }`
-  avec les 795 features du modèle (les valeurs peuvent être `null`).
+  avec les **795 features** du modèle (les valeurs peuvent être `null` : le modèle gère
+  l'imputation). Réponse : `{ "probability_default", "decision", "threshold" }`.
 - `GET /docs` : documentation interactive (Swagger).
 
-Lancer l'API en local :
+## Lancer en local
+
+Tout le stack (API + base PostgreSQL) avec Docker :
 
 ```bash
-uv run uvicorn api.main:app --reload
+docker compose up --build
 ```
 
-Avec Docker :
+- API : http://localhost:8000 (`/docs` pour Swagger)
+- Base PostgreSQL : `localhost:5433` (utilisateur `credit`, base `credit_scoring`)
+
+Pour **remplir la base** avec du trafic simulé (un lot normal + un lot "dérivé" qui imite
+une récession), place le dataset préparé dans `data/dataset.parquet` puis :
 
 ```bash
-docker build -t credit-scoring-api .
-docker run -p 7860:7860 credit-scoring-api
+uv run python scripts/simulate_traffic.py --url http://localhost:8000 --normal 200 --drift 200
 ```
+
+Pour lancer le **dashboard** en local :
+
+```bash
+uv run streamlit run monitoring/dashboard.py
+```
+
+## Monitoring (interprétation)
+
+Le dashboard (et le notebook `notebooks/05_monitoring.ipynb`) comparent les données de
+**production** à une **référence** (échantillon des données d'entraînement,
+`monitoring/reference_sample.parquet`).
+
+- **Dérive des données** : pour chaque feature surveillée, un **test de Kolmogorov-Smirnov**
+  donne un **p-value**. Un **p-value < 0.05** signale une **dérive** (la distribution a
+  réellement changé par rapport à l'entraînement). Le dashboard liste les features dérivées
+  et superpose les distributions référence vs production.
+- **Métriques opérationnelles** : nombre d'appels, **taux d'erreur**, **latence**
+  (moyenne et p95), distribution des scores prédits.
+
+Une dérive confirmée est un signal d'alerte : en situation réelle, elle déclencherait
+une investigation et, si elle persiste, un **réentraînement** du modèle.
+
+## Déploiement et CI/CD
+
+- **Déploiement** : décrit en infrastructure-as-code dans `render.yaml` (blueprint Render)
+  qui crée 3 ressources : la base PostgreSQL, l'API (`Dockerfile`) et le dashboard
+  (`Dockerfile.dashboard`).
+- **CI** (`.github/workflows/ci.yml`) : sur chaque pull request, lance les tests (pytest)
+  puis construit les images Docker.
+- **CD** (`.github/workflows/cd.yml`) : sur un push vers `main`, relance tests + build puis
+  **déclenche le déploiement sur Render** (via deploy hooks). Les secrets (token, hooks)
+  sont gérés dans GitHub, jamais dans le code.
 
 ## Structure du dépôt
 
 ```
 .
-├── notebooks/      # Analyse P6 : 01 EDA, 02 préparation, 03 modélisation, 04 optimisation
-├── models/         # Modèle entraîné (MLflow) + seuil de décision
-├── api/            # API d'inférence (projet 8)
-├── tests/          # Tests unitaires (projet 8)
-├── monitoring/     # Dashboard / analyse de data drift (projet 8)
-├── data/           # Données (non versionnées, voir .gitignore)
-├── Dockerfile      # Conteneurisation de l'API
-├── pyproject.toml  # Dépendances (gérées avec uv)
+├── api/                 # API d'inférence FastAPI + accès base de données
+├── models/              # Modèle entraîné (MLflow) + seuil de décision
+├── monitoring/          # Dashboard Streamlit, référence de drift, notebook d'analyse
+├── notebooks/           # Analyse P6 (01-04) + monitoring (05)
+├── scripts/             # Simulation de trafic de production
+├── tests/               # Tests unitaires de l'API
+├── data/                # Données (non versionnées, voir .gitignore)
+├── .github/workflows/   # Pipelines CI et CD
+├── Dockerfile           # Image de l'API
+├── Dockerfile.dashboard # Image du dashboard
+├── docker-compose.yml   # Stack local (API + PostgreSQL)
+├── render.yaml          # Blueprint de déploiement Render
+├── pyproject.toml       # Dépendances (gérées avec uv)
 └── README.md
 ```
 
 ## Installation
 
-Le projet utilise [uv](https://docs.astral.sh/uv/) :
+Le projet utilise [uv](https://docs.astral.sh/uv/). Les dépendances sont organisées en
+groupes : cœur (API), `notebooks` (analyse P6), `monitoring` (dashboard) et `dev` (tests).
 
 ```bash
-uv sync
+uv sync                                   # cœur + dev
+uv sync --group notebooks --group monitoring   # tout
 ```
 
 ## Données
