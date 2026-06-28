@@ -1,0 +1,26 @@
+# Environnements et caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Git / CI
+.git/
+.github/
+.gitignore
+
+# Analyse P6 (inutile dans l'image de l'API)
+notebooks/
+*.ipynb
+.ipynb_checkpoints/
+
+# Données et artefacts MLflow
+data/
+mlruns/
+mlflow.db
+
+# Tests
+tests/
+
+# Documentation
+*.md
