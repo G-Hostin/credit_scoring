@@ -21,3 +21,6 @@ data/processed/
 # MLflow
 mlruns/
 mlflow.db
+
+# Pytest
+.pytest_cache/
