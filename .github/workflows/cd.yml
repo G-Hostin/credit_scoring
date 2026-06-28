@@ -31,10 +31,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          fetch-depth: 0   # historique complet, nécessaire pour pousser vers HF
-      - name: Pousser vers le Space Hugging Face
+          python-version: "3.12"
+      - name: Installer huggingface_hub
+        run: pip install --quiet huggingface_hub
+      # On déploie avec la bibliothèque officielle HF : elle envoie les fichiers
+      # et gère automatiquement les binaires (model.pkl) via le stockage LFS/Xet.
+      - name: Déployer sur le Space Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force "https://g-hostin:${HF_TOKEN}@huggingface.co/spaces/g-hostin/credit_scoring" HEAD:main
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          HfApi(token=os.environ["HF_TOKEN"]).upload_folder(
+              folder_path=".",
+              repo_id="g-hostin/credit_scoring",
+              repo_type="space",
+              commit_message="Deploy from GitHub Actions",
+              ignore_patterns=[".git*", "notebooks/*", "tests/*", ".dockerignore"],
+          )
+          print("Deploiement termine.")
+          PY
