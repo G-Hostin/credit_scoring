@@ -24,7 +24,8 @@ COPY models ./models
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH=/app
 
-EXPOSE 8000
+# Hugging Face Spaces impose le port 7860.
+EXPOSE 7860
 
 # Démarrage : le modèle est chargé une seule fois (lifespan), puis l'API répond.
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "7860"]

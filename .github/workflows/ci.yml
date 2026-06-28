@@ -1,0 +1,33 @@
+name: CI
+
+# Intégration continue : tests + build de l'image, sur les pull requests
+# (vers dev ou main) et sur les push directs sur dev.
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v5
+      - name: Installer Python 3.13
+        run: uv python install 3.13
+      - name: Installer les dépendances (cœur + dev)
+        run: uv sync
+      - name: Lancer les tests
+        run: uv run pytest -q
+
+  build:
+    name: Build Docker
+    needs: test          # ne build que si les tests passent
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire l'image Docker
+        run: docker build -t credit-scoring-api .
