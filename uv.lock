@@ -1893,6 +1893,7 @@ dev = [
 ]
 monitoring = [
     { name = "evidently" },
+    { name = "plotly" },
     { name = "streamlit" },
 ]
 notebooks = [
@@ -1928,6 +1929,7 @@ dev = [
 ]
 monitoring = [
     { name = "evidently", specifier = ">=0.4" },
+    { name = "plotly", specifier = ">=5.24" },
     { name = "streamlit", specifier = ">=1.40" },
 ]
 notebooks = [

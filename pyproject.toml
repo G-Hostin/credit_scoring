@@ -35,6 +35,7 @@ notebooks = [
 monitoring = [
     "evidently>=0.4",
     "streamlit>=1.40",
+    "plotly>=5.24",
 ]
 # Outils de test.
 dev = [
