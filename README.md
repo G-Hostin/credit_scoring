@@ -1,3 +1,13 @@
+---
+title: Credit Scoring API
+emoji: 💳
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Credit Scoring - Modèle de scoring crédit "Prêt à dépenser"
 
 Outil de scoring crédit pour la société (fictive) **Prêt à dépenser** : à partir des
@@ -16,10 +26,33 @@ Ce dépôt couvre deux projets de la formation OpenClassrooms *AI Engineer* :
 
 - **Algorithme** : LightGBM (Pipeline scikit-learn : imputation médiane + classifieur).
 - **Gestion du déséquilibre** : `scale_pos_weight ≈ 11.39` (≈ 92 % bons clients / 8 % défauts).
-- **Métrique métier** : coût asymétrique `FN × 10 + FP × 1` (un faux négatif - défaut non
-  détecté - coûte 10× plus cher qu'un faux positif).
+- **Métrique métier** : coût asymétrique `FN x 10 + FP x 1` (un faux négatif, défaut non
+  détecté, coûte 10x plus cher qu'un faux positif).
 - **Seuil de décision optimal** : **0.53** (voir `models/threshold.json`).
 - Le modèle est packagé au format MLflow dans `models/credit_scoring_model/`.
+
+## API
+
+L'API (FastAPI) reçoit le dossier de features d'un client et retourne la probabilité de
+défaut et la décision.
+
+- `GET /health` : état de l'API et chargement du modèle.
+- `POST /predict` : prédiction. Corps attendu : `{ "features": { "<nom_feature>": valeur, ... } }`
+  avec les 795 features du modèle (les valeurs peuvent être `null`).
+- `GET /docs` : documentation interactive (Swagger).
+
+Lancer l'API en local :
+
+```bash
+uv run uvicorn api.main:app --reload
+```
+
+Avec Docker :
+
+```bash
+docker build -t credit-scoring-api .
+docker run -p 7860:7860 credit-scoring-api
+```
 
 ## Structure du dépôt
 
@@ -30,7 +63,8 @@ Ce dépôt couvre deux projets de la formation OpenClassrooms *AI Engineer* :
 ├── api/            # API d'inférence (projet 8)
 ├── tests/          # Tests unitaires (projet 8)
 ├── monitoring/     # Dashboard / analyse de data drift (projet 8)
-├── data/           # Données (non versionnées - voir .gitignore)
+├── data/           # Données (non versionnées, voir .gitignore)
+├── Dockerfile      # Conteneurisation de l'API
 ├── pyproject.toml  # Dépendances (gérées avec uv)
 └── README.md
 ```
