@@ -1,12 +1,12 @@
 """API de scoring crédit - Prêt à dépenser.
 
-Expose le modèle de scoring (Pipeline scikit-learn : imputation médiane + LightGBM)
-entraîné au projet 6. L'API reçoit le dossier de features d'un client et renvoie la
-probabilité de défaut ainsi que la décision (accordé / refusé) selon le seuil métier
-optimal (0.53).
+Sert le modèle de scoring (LightGBM du projet 6) converti au format **ONNX** pour une
+inférence rapide. L'API reçoit le dossier de features d'un client et renvoie la
+probabilité de défaut ainsi que la décision (accordé / refusé) selon le seuil métier (0.53).
 
-Le modèle est chargé UNE seule fois au démarrage (voir `lifespan`), puis réutilisé
-pour toutes les requêtes. Chaque prédiction est enregistrée en base (si configurée).
+Le modèle ONNX est chargé UNE seule fois au démarrage (voir `lifespan`). L'imputation des
+valeurs manquantes (médianes) est appliquée en amont, en numpy. Chaque prédiction est
+enregistrée en base en tâche de fond (si une base est configurée).
 """
 
 import json
@@ -14,17 +14,19 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import mlflow.sklearn
-import pandas as pd
-from fastapi import FastAPI, HTTPException
+import numpy as np
+import onnxruntime as ort
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from api.database import init_db, save_prediction
 
 # --- Chemins (relatifs à ce fichier, pour fonctionner aussi dans Docker) ---
-ROOT_DIR = Path(__file__).resolve().parents[1]
-MODEL_DIR = ROOT_DIR / "models" / "credit_scoring_model"
-THRESHOLD_PATH = ROOT_DIR / "models" / "threshold.json"
+MODELS_DIR = Path(__file__).resolve().parents[1] / "models"
+ONNX_PATH = MODELS_DIR / "credit_scoring_model.onnx"
+MEDIANS_PATH = MODELS_DIR / "imputer_medians.npy"
+FEATURES_PATH = MODELS_DIR / "feature_names.json"
+THRESHOLD_PATH = MODELS_DIR / "threshold.json"
 
 # Espace mémoire rempli au démarrage (le modèle n'est jamais rechargé par requête).
 state: dict = {}
@@ -33,9 +35,11 @@ state: dict = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Chargement des artefacts au démarrage de l'API, libération à l'arrêt."""
-    state["model"] = mlflow.sklearn.load_model(str(MODEL_DIR))
-    # Source de vérité : les noms et l'ordre des features vus à l'entraînement.
-    state["features"] = list(state["model"].feature_names_in_)
+    session = ort.InferenceSession(str(ONNX_PATH))
+    state["session"] = session
+    state["input_name"] = session.get_inputs()[0].name
+    state["medians"] = np.load(MEDIANS_PATH)  # médiane par feature (imputation des NaN)
+    state["features"] = json.loads(FEATURES_PATH.read_text(encoding="utf-8"))
     state["threshold"] = json.loads(THRESHOLD_PATH.read_text(encoding="utf-8"))["threshold"]
     init_db()  # crée la table 'predictions' si une base est configurée
     yield
@@ -48,7 +52,7 @@ app = FastAPI(
         "API de scoring crédit. Reçoit le dossier de features d'un client "
         "et retourne la probabilité de défaut et la décision (accordé / refusé)."
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -57,8 +61,8 @@ app = FastAPI(
 class PredictionRequest(BaseModel):
     """Dossier d'un client : les 795 features attendues par le modèle.
 
-    Les valeurs peuvent être `null` (données manquantes) : le modèle gère
-    l'imputation en interne. En revanche, toutes les clés doivent être présentes.
+    Les valeurs peuvent être `null` (données manquantes) : elles sont imputées par la
+    médiane. En revanche, toutes les clés doivent être présentes.
     """
 
     features: dict[str, float | None] = Field(
@@ -106,17 +110,18 @@ def health():
     """Vérifie que l'API tourne et que le modèle est bien chargé (utile au déploiement)."""
     return {
         "status": "ok",
-        "model_loaded": "model" in state,
+        "model_loaded": "session" in state,
         "n_features": len(state.get("features", [])),
     }
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["scoring"])
-def predict(request: PredictionRequest):
+def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
     """Calcule la probabilité de défaut et la décision pour un client.
 
-    Chaque appel (succès comme erreur) est enregistré en base avec sa latence,
-    pour permettre le suivi de production (drift, taux d'erreur, temps d'inférence).
+    Chaque appel (succès comme erreur) est enregistré en base en tâche de fond
+    (BackgroundTasks) : la réponse est renvoyée immédiatement, l'écriture en base
+    n'allonge pas le temps de réponse. Sert au suivi de production (drift, erreurs, latence).
     """
     start = time.perf_counter()
     expected = state["features"]
@@ -142,17 +147,22 @@ def predict(request: PredictionRequest):
                 detail={"message": "Validation metier echouee.", "errors": business_errors},
             )
 
-        # 3) Construction de la ligne dans le bon ordre, puis prédiction
+        # 3) Inférence : vecteur numpy -> imputation (médianes) -> ONNX Runtime.
         try:
-            row = {feature: provided[feature] for feature in expected}
-            X = pd.DataFrame([row], columns=expected).astype(float)
-            probability_default = float(state["model"].predict_proba(X)[0, 1])
+            row = np.array(
+                [[provided[f] if provided[f] is not None else np.nan for f in expected]],
+                dtype=np.float32,
+            )
+            row = np.where(np.isnan(row), state["medians"], row)
+            outputs = state["session"].run(None, {state["input_name"]: row})
+            probability_default = float(outputs[1][0][1])  # P(classe 1 = défaut)
         except Exception as exc:  # garde-fou : toute erreur inattendue -> 500 explicite
             raise HTTPException(status_code=500, detail=f"Erreur lors de la prediction : {exc}")
 
     except HTTPException as exc:
-        # On enregistre l'échec (pour le taux d'erreur) puis on relaie l'erreur.
-        save_prediction(
+        # On enregistre l'échec en tâche de fond (pour le taux d'erreur) puis on relaie.
+        background_tasks.add_task(
+            save_prediction,
             features=provided,
             probability_default=None,
             decision=None,
@@ -167,8 +177,9 @@ def predict(request: PredictionRequest):
     decision = "refusé" if probability_default >= threshold else "accordé"
     latency_ms = (time.perf_counter() - start) * 1000
 
-    # On enregistre la prédiction réussie.
-    save_prediction(
+    # On enregistre la prédiction réussie en tâche de fond (après la réponse).
+    background_tasks.add_task(
+        save_prediction,
         features=provided,
         probability_default=probability_default,
         decision=decision,
