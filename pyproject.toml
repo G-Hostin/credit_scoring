@@ -31,6 +31,12 @@ notebooks = [
     "numba>=0.59",
     "xgboost>=3.2.0",
 ]
+# Monitoring : analyse de drift + dashboard (étape 3 — PAS dans l'API).
+monitoring = [
+    "evidently>=0.4",
+    "streamlit>=1.40",
+    "plotly>=5.24",
+]
 # Outils de test.
 dev = [
     "pytest>=8.0",

@@ -1,7 +1,7 @@
 name: CD
 
-# Déploiement continu : au push sur main (après merge), on revalide
-# (tests + build) puis on déploie sur Hugging Face Spaces.
+# Déploiement continu : au push sur main, on revalide (tests + build des images)
+# puis on déclenche le déploiement des services sur Render via leurs deploy hooks.
 on:
   push:
     branches: [main]
@@ -23,35 +23,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t credit-scoring-api .
+      - name: Build de l'image API
+        run: docker build -t credit-scoring-api .
+      - name: Build de l'image dashboard
+        run: docker build -t credit-scoring-dashboard -f Dockerfile.dashboard .
 
   deploy:
-    name: Déploiement Hugging Face
+    name: Déploiement Render
     needs: build         # ne déploie que si tests + build sont OK
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Installer huggingface_hub
-        run: pip install --quiet huggingface_hub
-      # On déploie avec la bibliothèque officielle HF : elle envoie les fichiers
-      # et gère automatiquement les binaires (model.pkl) via le stockage LFS/Xet.
-      - name: Déployer sur le Space Hugging Face
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python - <<'PY'
-          import os
-          from huggingface_hub import HfApi
-
-          HfApi(token=os.environ["HF_TOKEN"]).upload_folder(
-              folder_path=".",
-              repo_id="g-hostin/credit_scoring",
-              repo_type="space",
-              commit_message="Deploy from GitHub Actions",
-              ignore_patterns=[".git*", "notebooks/*", "tests/*", ".dockerignore"],
-          )
-          print("Deploiement termine.")
-          PY
+      - name: Déclencher le déploiement de l'API
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_API }}"
+      - name: Déclencher le déploiement du dashboard
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_DASHBOARD }}"
