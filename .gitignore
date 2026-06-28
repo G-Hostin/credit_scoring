@@ -24,3 +24,6 @@ mlflow.db
 
 # Pytest
 .pytest_cache/
+
+# Rapport Evidently généré
+monitoring/drift_report.html
