@@ -1,0 +1,31 @@
+# Blueprint Render : décrit toute l'infrastructure (base + API + dashboard).
+# Render lit ce fichier et déploie les 3 services ensemble.
+
+databases:
+  - name: credit-scoring-db
+    plan: free
+
+services:
+  # API de scoring (conteneur Docker)
+  - type: web
+    name: credit-scoring-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: credit-scoring-db
+          property: connectionString
+
+  # Dashboard de monitoring (conteneur Docker)
+  - type: web
+    name: credit-scoring-dashboard
+    runtime: docker
+    dockerfilePath: ./Dockerfile.dashboard
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: credit-scoring-db
+          property: connectionString
