@@ -4,23 +4,37 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
-# Dépendances "cœur" : strictement ce dont l'API a besoin en production
-# (c'est cet ensemble qui sera installé dans l'image Docker).
+# Dépendances "cœur" : strictement ce dont l'API a besoin en production.
+# L'inférence se fait via ONNX Runtime, donc plus besoin de mlflow/lightgbm/sklearn/pandas.
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.34",
-    "mlflow>=3.0",
-    "lightgbm>=4.6.0",
-    "scikit-learn>=1.8.0",
-    "pandas>=2.0,<3.0",
+    "onnxruntime>=1.18",
     "numpy>=2.4.4",
-    "pyarrow<24",
     "sqlalchemy>=2.0",
     "psycopg[binary]>=3.2",
 ]
 
 [dependency-groups]
-# Stack d'analyse du projet 6 (notebooks) — PAS embarquée dans l'API.
+# Modèle d'origine (projet 6) + conversion ONNX. Sert au script de conversion.
+modeling = [
+    "mlflow>=3.0",
+    "lightgbm>=4.6.0",
+    "scikit-learn>=1.8.0",
+    "pandas>=2.0,<3.0",
+    "pyarrow<24",
+    "skl2onnx>=1.17",
+    "onnxmltools>=1.12",
+]
+# Monitoring : analyse de drift + dashboard (étape 3).
+monitoring = [
+    "evidently>=0.4",
+    "streamlit>=1.40",
+    "plotly>=5.24",
+    "pandas>=2.0,<3.0",
+    "pyarrow<24",
+]
+# Notebooks d'analyse du projet 6.
 notebooks = [
     "ipykernel>=7.2.0",
     "jupyterlab>=4.5.7",
@@ -30,12 +44,11 @@ notebooks = [
     "shap>=0.46",
     "numba>=0.59",
     "xgboost>=3.2.0",
-]
-# Monitoring : analyse de drift + dashboard (étape 3 — PAS dans l'API).
-monitoring = [
-    "evidently>=0.4",
-    "streamlit>=1.40",
-    "plotly>=5.24",
+    "pandas>=2.0,<3.0",
+    "pyarrow<24",
+    "scikit-learn>=1.8.0",
+    "lightgbm>=4.6.0",
+    "mlflow>=3.0",
 ]
 # Outils de test.
 dev = [
