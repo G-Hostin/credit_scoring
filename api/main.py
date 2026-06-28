@@ -16,7 +16,7 @@ from pathlib import Path
 
 import mlflow.sklearn
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from api.database import init_db, save_prediction
@@ -112,11 +112,12 @@ def health():
 
 
 @app.post("/predict", response_model=PredictionResponse, tags=["scoring"])
-def predict(request: PredictionRequest):
+def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
     """Calcule la probabilité de défaut et la décision pour un client.
 
-    Chaque appel (succès comme erreur) est enregistré en base avec sa latence,
-    pour permettre le suivi de production (drift, taux d'erreur, temps d'inférence).
+    Chaque appel (succès comme erreur) est enregistré en base en tâche de fond
+    (BackgroundTasks) : la réponse est renvoyée immédiatement, l'écriture en base
+    n'allonge pas le temps de réponse. Sert au suivi de production (drift, erreurs, latence).
     """
     start = time.perf_counter()
     expected = state["features"]
@@ -151,8 +152,9 @@ def predict(request: PredictionRequest):
             raise HTTPException(status_code=500, detail=f"Erreur lors de la prediction : {exc}")
 
     except HTTPException as exc:
-        # On enregistre l'échec (pour le taux d'erreur) puis on relaie l'erreur.
-        save_prediction(
+        # On enregistre l'échec en tâche de fond (pour le taux d'erreur) puis on relaie.
+        background_tasks.add_task(
+            save_prediction,
             features=provided,
             probability_default=None,
             decision=None,
@@ -167,8 +169,9 @@ def predict(request: PredictionRequest):
     decision = "refusé" if probability_default >= threshold else "accordé"
     latency_ms = (time.perf_counter() - start) * 1000
 
-    # On enregistre la prédiction réussie.
-    save_prediction(
+    # On enregistre la prédiction réussie en tâche de fond (après la réponse).
+    background_tasks.add_task(
+        save_prediction,
         features=provided,
         probability_default=probability_default,
         decision=decision,
