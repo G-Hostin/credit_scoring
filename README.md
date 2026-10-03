@@ -14,13 +14,13 @@ Outil de scoring crédit pour la société (fictive) **Prêt à dépenser** : à
 informations d'un client, le modèle prédit la **probabilité de défaut de paiement** et
 classe la demande en **accordée / refusée**.
 
-Ce dépôt couvre deux projets de la formation OpenClassrooms *AI Engineer* :
+Ce dépôt couvre un projet MLOps de bout en bout, en deux volets :
 
-- **Projet 6 - Initiez-vous au MLOps (partie 1/2)** : exploration des données, feature
-  engineering, modélisation et suivi des expérimentations avec MLflow.
-- **Projet 8 - Déployez et monitorez votre modèle (partie 2/2)** : mise en production du
-  modèle via une API, conteneurisation Docker, CI/CD, stockage des données de production
-  et monitoring (data drift).
+- **Modélisation** : exploration des données, feature engineering, modélisation et suivi
+  des expérimentations avec MLflow.
+- **Mise en production et monitoring** : mise en production du modèle via une API,
+  conteneurisation Docker, CI/CD, stockage des données de production et monitoring
+  (data drift).
 
 ## Démo en ligne
 
@@ -136,7 +136,7 @@ optimisations (profiling avec `cProfile`, puis mesures avant / après) :
 ├── api/                 # API d'inférence FastAPI + accès base de données
 ├── models/              # Modèle MLflow + modèle ONNX + médianes + seuil de décision
 ├── monitoring/          # Dashboard Streamlit, référence de drift, notebook d'analyse
-├── notebooks/           # Analyse P6 (01-04) + monitoring (05) + optimisation (06)
+├── notebooks/           # Exploration et modélisation (01-04) + monitoring (05) + optimisation (06)
 ├── scripts/             # Simulation de trafic + conversion ONNX
 ├── tests/               # Tests unitaires de l'API
 ├── data/                # Données (non versionnées, voir .gitignore)
@@ -154,7 +154,7 @@ optimisations (profiling avec `cProfile`, puis mesures avant / après) :
 Le projet utilise [uv](https://docs.astral.sh/uv/). Le **cœur** (runtime de l'API) est
 volontairement léger (FastAPI, ONNX Runtime, accès base). Le reste est rangé en groupes :
 `modeling` (modèle d'origine + conversion ONNX), `monitoring` (dashboard), `notebooks`
-(analyse P6) et `dev` (tests).
+(exploration et modélisation) et `dev` (tests).
 
 ```bash
 uv sync                                                        # cœur + dev (lancer / tester l'API)
